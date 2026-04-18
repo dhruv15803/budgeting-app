@@ -35,6 +35,8 @@ func (h *Handler) DeleteUserById(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("health Ok"))
+	if err := writeJsonResponse(w, http.StatusOK, ApiResponse{Success: true, Message: "Health check successful"}); err != nil {
+		writeJsonError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
 }
