@@ -11,6 +11,7 @@ import (
 
 	"github.com/dhruv15803/budgeting-app/internal/auth"
 	"github.com/dhruv15803/budgeting-app/internal/config"
+	"github.com/dhruv15803/budgeting-app/internal/models"
 	"github.com/dhruv15803/budgeting-app/internal/repositories"
 	"github.com/dhruv15803/budgeting-app/internal/worker"
 )
@@ -29,6 +30,17 @@ func NewUserService(repo *repositories.Repository, cfg *config.Config, jwt *auth
 		jwt:  jwt,
 		q:    q,
 	}
+}
+
+func (u *UserServiceImpl) GetMe(userID int) (*models.User, error) {
+	user, err := u.repo.Users.GetByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, ErrNotFound
+	}
+	return user, nil
 }
 
 func (u *UserServiceImpl) DeleteUserById(id int) error {

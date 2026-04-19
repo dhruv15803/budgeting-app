@@ -18,6 +18,19 @@ func NewUserRepo(db *sqlx.DB) *UserRepo {
 	}
 }
 
+func (u *UserRepo) GetByID(id int) (*models.User, error) {
+	var out models.User
+	err := u.db.Get(&out, `
+		SELECT id, email, username, password, image_url, role::text AS role,
+		       is_verified, verified_at, created_at, updated_at
+		FROM users WHERE id = $1
+	`, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return &out, err
+}
+
 func (u *UserRepo) DeleteUserById(id int) error {
 	_, err := u.db.Exec("DELETE FROM users WHERE id = $1", id)
 	if err != nil {

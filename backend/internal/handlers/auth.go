@@ -4,9 +4,20 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/dhruv15803/budgeting-app/internal/services"
 )
+
+type meResponse struct {
+	ID        int        `json:"id"`
+	Email     string     `json:"email"`
+	Username  *string    `json:"username"`
+	ImageURL  *string    `json:"image_url"`
+	Role      string     `json:"role"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at"`
+}
 
 type registerRequest struct {
 	Email    string  `json:"email"`
@@ -100,6 +111,43 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	resp.Message = "Email verified"
 	resp.Data.Token = out
 	if err := writeJsonResponse(w, http.StatusOK, resp); err != nil {
+		_ = writeJsonError(w, http.StatusInternalServerError, "internal server error")
+	}
+}
+
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	claims := claimsFromRequest(r)
+	if claims == nil {
+		_ = writeJsonError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	user, err := h.services.Users.GetMe(claims.UserID)
+	if errors.Is(err, services.ErrNotFound) {
+		_ = writeJsonError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err != nil {
+		_ = writeJsonError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	data := meResponse{
+		ID:        user.ID,
+		Email:     user.Email,
+		Username:  user.Username,
+		ImageURL:  user.ImageURL,
+		Role:      user.Role,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}
+
+	type meResp struct {
+		Success bool       `json:"success"`
+		Message string     `json:"message"`
+		Data    meResponse `json:"data"`
+	}
+	if err := writeJsonResponse(w, http.StatusOK, meResp{Success: true, Message: "ok", Data: data}); err != nil {
 		_ = writeJsonError(w, http.StatusInternalServerError, "internal server error")
 	}
 }

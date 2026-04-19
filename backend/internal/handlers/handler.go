@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dhruv15803/budgeting-app/internal/auth"
+	"github.com/dhruv15803/budgeting-app/internal/middleware"
 	"github.com/dhruv15803/budgeting-app/internal/services"
 	"github.com/go-chi/chi/v5"
 )
@@ -16,6 +18,10 @@ func NewHandler(services *services.Service) *Handler {
 	return &Handler{
 		services: services,
 	}
+}
+
+func claimsFromRequest(r *http.Request) *auth.Claims {
+	return middleware.ClaimsFromContext(r.Context())
 }
 
 func (h *Handler) DeleteUserById(w http.ResponseWriter, r *http.Request) {
