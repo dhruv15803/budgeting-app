@@ -13,6 +13,18 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// parseDate parses a YYYY-MM-DD string into a time.Time pointer; returns nil on empty input.
+func parseDate(s string) (*time.Time, error) {
+	if s == "" {
+		return nil, nil
+	}
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
 type createExpenseRequest struct {
 	Title       string  `json:"title"`
 	Description *string `json:"description"`
@@ -201,23 +213,96 @@ func (h *Handler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := 1
-	pageSize := 20
+	q := r.URL.Query()
+	f := models.ExpenseFilter{
+		Page:     1,
+		PageSize: 20,
+		SortBy:   q.Get("sort_by"),
+	}
 
-	if p := r.URL.Query().Get("page"); p != "" {
+	if p := q.Get("page"); p != "" {
 		if v, err := strconv.Atoi(p); err == nil && v > 0 {
-			page = v
+			f.Page = v
 		}
 	}
-	if ps := r.URL.Query().Get("page_size"); ps != "" {
+	if ps := q.Get("page_size"); ps != "" {
 		if v, err := strconv.Atoi(ps); err == nil && v > 0 {
-			pageSize = v
+			f.PageSize = v
 		}
 	}
 
-	expenses, total, err := h.services.Expenses.ListExpenses(claims.UserID, page, pageSize)
+	if s := q.Get("search"); s != "" {
+		f.Search = &s
+	}
+
+	// Explicit date range takes precedence over month/year shorthands.
+	dateFrom, err := parseDate(q.Get("date_from"))
 	if err != nil {
-		_ = writeJsonError(w, http.StatusInternalServerError, "internal server error")
+		_ = writeJsonError(w, http.StatusBadRequest, "date_from must be in YYYY-MM-DD format")
+		return
+	}
+	dateTo, err := parseDate(q.Get("date_to"))
+	if err != nil {
+		_ = writeJsonError(w, http.StatusBadRequest, "date_to must be in YYYY-MM-DD format")
+		return
+	}
+
+	// month shorthand: ?month=YYYY-MM expands to first and last day of the month.
+	if dateFrom == nil && dateTo == nil {
+		if monthStr := q.Get("month"); monthStr != "" {
+			m, err := time.Parse("2006-01", monthStr)
+			if err != nil {
+				_ = writeJsonError(w, http.StatusBadRequest, "month must be in YYYY-MM format")
+				return
+			}
+			first := time.Date(m.Year(), m.Month(), 1, 0, 0, 0, 0, time.UTC)
+			last := first.AddDate(0, 1, -1)
+			dateFrom = &first
+			dateTo = &last
+		} else if yearStr := q.Get("year"); yearStr != "" {
+			// year shorthand: ?year=YYYY expands to Jan 1 – Dec 31.
+			yr, err := strconv.Atoi(yearStr)
+			if err != nil || yr < 1 {
+				_ = writeJsonError(w, http.StatusBadRequest, "year must be a valid 4-digit year")
+				return
+			}
+			first := time.Date(yr, time.January, 1, 0, 0, 0, 0, time.UTC)
+			last := time.Date(yr, time.December, 31, 0, 0, 0, 0, time.UTC)
+			dateFrom = &first
+			dateTo = &last
+		}
+	}
+
+	f.DateFrom = dateFrom
+	f.DateTo = dateTo
+
+	// category_id is repeatable: ?category_id=1&category_id=3
+	for _, cidStr := range q["category_id"] {
+		if cid, err := strconv.Atoi(cidStr); err == nil && cid > 0 {
+			f.CategoryIDs = append(f.CategoryIDs, cid)
+		}
+	}
+
+	if amtMin := q.Get("amount_min"); amtMin != "" {
+		v, err := strconv.ParseFloat(amtMin, 64)
+		if err != nil || v < 0 {
+			_ = writeJsonError(w, http.StatusBadRequest, "amount_min must be a non-negative number")
+			return
+		}
+		f.AmountMin = &v
+	}
+	if amtMax := q.Get("amount_max"); amtMax != "" {
+		v, err := strconv.ParseFloat(amtMax, 64)
+		if err != nil || v < 0 {
+			_ = writeJsonError(w, http.StatusBadRequest, "amount_max must be a non-negative number")
+			return
+		}
+		f.AmountMax = &v
+	}
+
+	expenses, total, err := h.services.Expenses.ListExpenses(claims.UserID, f)
+	if err != nil {
+		_ = writeJsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -226,7 +311,7 @@ func (h *Handler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 		items = append(items, toExpenseResponse(&expenses[i]))
 	}
 
-	totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
+	totalPages := int(math.Ceil(float64(total) / float64(f.PageSize)))
 	if totalPages < 1 {
 		totalPages = 1
 	}
@@ -242,8 +327,8 @@ func (h *Handler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 		Data: expenseListData{
 			Expenses:   items,
 			Total:      total,
-			Page:       page,
-			PageSize:   pageSize,
+			Page:       f.Page,
+			PageSize:   f.PageSize,
 			TotalPages: totalPages,
 		},
 	}); err != nil {

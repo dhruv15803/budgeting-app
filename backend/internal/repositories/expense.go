@@ -3,6 +3,8 @@ package repositories
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dhruv15803/budgeting-app/internal/models"
@@ -61,20 +63,76 @@ func (e *ExpenseRepo) Delete(id int) error {
 	return err
 }
 
-func (e *ExpenseRepo) ListByUser(userID, limit, offset int) ([]models.Expense, int, error) {
+var sortOrders = map[string]string{
+	"date_asc":    "expense_date ASC,  created_at ASC",
+	"date_desc":   "expense_date DESC, created_at DESC",
+	"amount_asc":  "amount ASC,  expense_date DESC",
+	"amount_desc": "amount DESC, expense_date DESC",
+}
+
+func (e *ExpenseRepo) ListByUser(userID int, f models.ExpenseFilter) ([]models.Expense, int, error) {
+	where := []string{"user_id = $1"}
+	args := []interface{}{userID}
+	n := 2
+
+	if f.Search != nil && *f.Search != "" {
+		where = append(where, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d)", n, n))
+		args = append(args, "%"+*f.Search+"%")
+		n++
+	}
+	if f.DateFrom != nil {
+		where = append(where, fmt.Sprintf("expense_date >= $%d", n))
+		args = append(args, *f.DateFrom)
+		n++
+	}
+	if f.DateTo != nil {
+		where = append(where, fmt.Sprintf("expense_date <= $%d", n))
+		args = append(args, *f.DateTo)
+		n++
+	}
+	if len(f.CategoryIDs) > 0 {
+		where = append(where, fmt.Sprintf("category_id = ANY($%d)", n))
+		args = append(args, f.CategoryIDs)
+		n++
+	}
+	if f.AmountMin != nil {
+		where = append(where, fmt.Sprintf("amount >= $%d", n))
+		args = append(args, *f.AmountMin)
+		n++
+	}
+	if f.AmountMax != nil {
+		where = append(where, fmt.Sprintf("amount <= $%d", n))
+		args = append(args, *f.AmountMax)
+		n++
+	}
+
+	whereClause := "WHERE " + strings.Join(where, " AND ")
+
+	orderClause := sortOrders["date_desc"]
+	if order, ok := sortOrders[f.SortBy]; ok {
+		orderClause = order
+	}
+
 	var total int
-	if err := e.db.Get(&total, `SELECT COUNT(*) FROM expenses WHERE user_id = $1`, userID); err != nil {
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM expenses %s", whereClause)
+	if err := e.db.Get(&total, countQuery, args...); err != nil {
 		return nil, 0, err
 	}
 
-	var rows []models.Expense
-	if err := e.db.Select(&rows, `
+	limit := f.PageSize
+	offset := (f.Page - 1) * f.PageSize
+
+	selectArgs := append(args, limit, offset)
+	dataQuery := fmt.Sprintf(`
 		SELECT id, title, description, amount, user_id, category_id, recurring_expense_id, expense_date, created_at, updated_at
 		FROM expenses
-		WHERE user_id = $1
-		ORDER BY expense_date DESC, created_at DESC
-		LIMIT $2 OFFSET $3
-	`, userID, limit, offset); err != nil {
+		%s
+		ORDER BY %s
+		LIMIT $%d OFFSET $%d
+	`, whereClause, orderClause, n, n+1)
+
+	var rows []models.Expense
+	if err := e.db.Select(&rows, dataQuery, selectArgs...); err != nil {
 		return nil, 0, err
 	}
 

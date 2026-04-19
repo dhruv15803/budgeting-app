@@ -47,5 +47,5 @@ type ExpenseRepository interface {
 	GetByID(id int) (*models.Expense, error)
 	Update(id int, title string, description *string, amount float64, categoryID int, expenseDate time.Time) (*models.Expense, error)
 	Delete(id int) error
-	ListByUser(userID, limit, offset int) ([]models.Expense, int, error)
+	ListByUser(userID int, f models.ExpenseFilter) ([]models.Expense, int, error)
 }

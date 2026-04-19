@@ -74,16 +74,23 @@ func (s *ExpenseServiceImpl) DeleteExpense(expenseID, requestingUserID int) erro
 	return s.repo.Expenses.Delete(expenseID)
 }
 
-func (s *ExpenseServiceImpl) ListExpenses(userID, page, pageSize int) ([]models.Expense, int, error) {
-	if page < 1 {
-		page = 1
+func (s *ExpenseServiceImpl) ListExpenses(userID int, f models.ExpenseFilter) ([]models.Expense, int, error) {
+	if f.Page < 1 {
+		f.Page = 1
 	}
-	if pageSize < 1 {
-		pageSize = 20
+	if f.PageSize < 1 {
+		f.PageSize = 20
 	}
-	if pageSize > 100 {
-		pageSize = 100
+	if f.PageSize > 100 {
+		f.PageSize = 100
 	}
-	offset := (page - 1) * pageSize
-	return s.repo.Expenses.ListByUser(userID, pageSize, offset)
+
+	if f.DateFrom != nil && f.DateTo != nil && f.DateFrom.After(*f.DateTo) {
+		return nil, 0, fmt.Errorf("date_from must not be after date_to")
+	}
+	if f.AmountMin != nil && f.AmountMax != nil && *f.AmountMin > *f.AmountMax {
+		return nil, 0, fmt.Errorf("amount_min must not be greater than amount_max")
+	}
+
+	return s.repo.Expenses.ListByUser(userID, f)
 }

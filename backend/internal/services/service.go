@@ -34,5 +34,5 @@ type ExpenseService interface {
 	CreateExpense(userID, categoryID int, title string, description *string, amount float64, expenseDate time.Time) (*models.Expense, error)
 	UpdateExpense(expenseID, requestingUserID, categoryID int, title string, description *string, amount float64, expenseDate time.Time) (*models.Expense, error)
 	DeleteExpense(expenseID, requestingUserID int) error
-	ListExpenses(userID, page, pageSize int) ([]models.Expense, int, error)
+	ListExpenses(userID int, f models.ExpenseFilter) ([]models.Expense, int, error)
 }
