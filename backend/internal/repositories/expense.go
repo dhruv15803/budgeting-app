@@ -63,6 +63,27 @@ func (e *ExpenseRepo) Delete(id int) error {
 	return err
 }
 
+// CreateFromRecurringTx inserts an expense derived from a recurring expense on the given date.
+// Uses ON CONFLICT on the partial unique index (recurring_expense_id, expense_date) so repeated
+// generator runs are safe and never produce duplicates. Returns true if a row was actually inserted.
+func (e *ExpenseRepo) CreateFromRecurringTx(tx *sqlx.Tx, r *models.RecurringExpense, date time.Time) (bool, error) {
+	res, err := tx.Exec(`
+		INSERT INTO expenses (title, description, amount, user_id, category_id, recurring_expense_id, expense_date)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (recurring_expense_id, expense_date)
+		WHERE recurring_expense_id IS NOT NULL
+		DO NOTHING
+	`, r.Title, r.Description, r.Amount, r.UserID, r.CategoryID, r.ID, date)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
 var sortOrders = map[string]string{
 	"date_asc":    "expense_date ASC,  created_at ASC",
 	"date_desc":   "expense_date DESC, created_at DESC",

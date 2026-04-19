@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -46,9 +47,11 @@ type Config struct {
 	EmailVerificationBaseURL  string
 	EmailVerificationTokenTTL time.Duration
 	SMTP                      SMTPConfig
+	CronSchedule              string
+	CORSAllowedOrigins        []string
 }
 
-func NewConfig(addr string, readTimeout, writeTimeout time.Duration, dbConfig DbConfig, jwtSecret string, jwtExpiry time.Duration, emailVerificationBaseURL string, emailVerificationTokenTTL time.Duration, smtp SMTPConfig) *Config {
+func NewConfig(addr string, readTimeout, writeTimeout time.Duration, dbConfig DbConfig, jwtSecret string, jwtExpiry time.Duration, emailVerificationBaseURL string, emailVerificationTokenTTL time.Duration, smtp SMTPConfig, cronSchedule string, corsAllowedOrigins []string) *Config {
 	return &Config{
 		Addr:                      addr,
 		ReadTimeout:               readTimeout,
@@ -59,6 +62,8 @@ func NewConfig(addr string, readTimeout, writeTimeout time.Duration, dbConfig Db
 		EmailVerificationBaseURL:  emailVerificationBaseURL,
 		EmailVerificationTokenTTL: emailVerificationTokenTTL,
 		SMTP:                      smtp,
+		CronSchedule:              cronSchedule,
+		CORSAllowedOrigins:        corsAllowedOrigins,
 	}
 }
 
@@ -117,6 +122,26 @@ func LoadConfig() (*Config, error) {
 		From:     os.Getenv("SMTP_FROM"),
 	}
 
+	cronSchedule := os.Getenv("CRON_SCHEDULE")
+	if cronSchedule == "" {
+		cronSchedule = "5 0 * * *" // 00:05 UTC daily
+	}
+
+	corsRaw := os.Getenv("CORS_ALLOWED_ORIGINS")
+	var corsAllowedOrigins []string
+	if corsRaw != "" {
+		for _, o := range strings.Split(corsRaw, ",") {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				corsAllowedOrigins = append(corsAllowedOrigins, o)
+			}
+		}
+	}
+	if len(corsAllowedOrigins) == 0 {
+		// Default: allow local frontend dev servers
+		corsAllowedOrigins = []string{"http://localhost:5173", "http://localhost:3001"}
+	}
+
 	return NewConfig(
 		":"+port,
 		time.Second*15,
@@ -127,5 +152,7 @@ func LoadConfig() (*Config, error) {
 		baseURL,
 		tokenTTL,
 		smtp,
+		cronSchedule,
+		corsAllowedOrigins,
 	), nil
 }
