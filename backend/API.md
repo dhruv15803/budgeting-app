@@ -262,7 +262,7 @@ List the authenticated user's expenses with optional filtering and pagination.
 |---|---|---|---|
 | `page` | integer | `1` | Page number |
 | `page_size` | integer | `20` | Items per page |
-| `sort_by` | string | `expense_date DESC` | Column + direction, e.g. `amount ASC`, `title ASC`, `expense_date ASC` |
+| `sort_by` | string | `date_desc` | One of: `date_desc`, `date_asc`, `amount_desc`, `amount_asc`. Unknown values fall back to `date_desc`. |
 | `search` | string | — | Full-text search on `title` and `description` (case-insensitive) |
 | `date_from` | string | — | `YYYY-MM-DD` — start of range (inclusive) |
 | `date_to` | string | — | `YYYY-MM-DD` — end of range (inclusive) |
@@ -292,7 +292,7 @@ List the authenticated user's expenses with optional filtering and pagination.
 GET /api/expenses?month=2026-04
 GET /api/expenses?year=2026&category_id=1&category_id=5
 GET /api/expenses?search=grocery&amount_min=10&amount_max=200
-GET /api/expenses?date_from=2026-01-01&date_to=2026-03-31&sort_by=amount+DESC
+GET /api/expenses?date_from=2026-01-01&date_to=2026-03-31&sort_by=amount_desc
 ```
 
 ---

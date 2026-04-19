@@ -3,10 +3,10 @@ package models
 import "time"
 
 type ExpenseCategory struct {
-	ID           int        `db:"id"`
-	CategoryName string     `db:"category_name"`
-	CreatedAt    time.Time  `db:"created_at"`
-	UpdatedAt    *time.Time `db:"updated_at"`
+	ID           int        `db:"id" json:"id"`
+	CategoryName string     `db:"category_name" json:"category_name"`
+	CreatedAt    time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt    *time.Time `db:"updated_at" json:"updated_at"`
 }
 
 type Expense struct {
