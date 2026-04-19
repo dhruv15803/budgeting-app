@@ -1,17 +1,40 @@
 package repositories
 
-import "github.com/jmoiron/sqlx"
+import (
+	"time"
+
+	"github.com/dhruv15803/budgeting-app/internal/models"
+	"github.com/jmoiron/sqlx"
+)
 
 type Repository struct {
-	Users UserRepository
+	db                *sqlx.DB
+	Users             UserRepository
+	EmailVerification EmailVerificationRepository
 }
 
 func NewRepository(db *sqlx.DB) *Repository {
 	return &Repository{
-		Users: NewUserRepo(db),
+		db:                db,
+		Users:             NewUserRepo(db),
+		EmailVerification: NewEmailVerificationRepo(db),
 	}
+}
+
+func (r *Repository) BeginTx() (*sqlx.Tx, error) {
+	return r.db.Beginx()
 }
 
 type UserRepository interface {
 	DeleteUserById(id int) error
+	GetByEmail(email string) (*models.User, error)
+	GetByEmailTx(tx *sqlx.Tx, email string) (*models.User, error)
+	CreateUserTx(tx *sqlx.Tx, email string, username *string, passwordHash string) (int, error)
+	UpdateUnverifiedCredentialsTx(tx *sqlx.Tx, userID int, username *string, passwordHash string) error
+}
+
+type EmailVerificationRepository interface {
+	DeleteByUserIDTx(tx *sqlx.Tx, userID int) error
+	InsertTx(tx *sqlx.Tx, userID int, tokenHash string, expiresAt time.Time) error
+	VerifyTokenTx(tx *sqlx.Tx, tokenHash string) (*models.User, error)
 }

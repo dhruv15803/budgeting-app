@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
+	"github.com/dhruv15803/budgeting-app/internal/auth"
 	"github.com/dhruv15803/budgeting-app/internal/config"
 	"github.com/dhruv15803/budgeting-app/internal/database"
+	"github.com/dhruv15803/budgeting-app/internal/email"
 	"github.com/dhruv15803/budgeting-app/internal/handlers"
 	"github.com/dhruv15803/budgeting-app/internal/repositories"
 	"github.com/dhruv15803/budgeting-app/internal/services"
+	"github.com/dhruv15803/budgeting-app/internal/worker"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -27,14 +31,29 @@ func main() {
 
 	log.Println("Connected to database")
 
+	queue := worker.NewQueue(256)
+	sender := email.NewSender(cfg.SMTP)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	worker.RunVerificationMailWorker(ctx, queue, sender.SendVerification, log.Printf)
+
+	jwtSigner := auth.NewJWTSigner(cfg.JWTSecret, cfg.JWTExpiry)
+
 	repo := repositories.NewRepository(db)
-	service := services.NewService(repo)
+	service := services.NewService(repo, cfg, jwtSigner, queue)
 	handler := handlers.NewHandler(service)
 
 	r := chi.NewRouter()
 
 	r.Route("/api", func(r chi.Router) {
+
 		r.Get("/health", handler.HealthCheckHandler)
+
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/register", handler.Register)
+			r.Post("/login", handler.Login)
+			r.Get("/verify-email", handler.VerifyEmail)
+		})
 	})
 
 	server := http.Server{
