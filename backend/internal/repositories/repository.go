@@ -11,6 +11,7 @@ type Repository struct {
 	db                *sqlx.DB
 	Users             UserRepository
 	EmailVerification EmailVerificationRepository
+	Expenses          ExpenseRepository
 }
 
 func NewRepository(db *sqlx.DB) *Repository {
@@ -18,6 +19,7 @@ func NewRepository(db *sqlx.DB) *Repository {
 		db:                db,
 		Users:             NewUserRepo(db),
 		EmailVerification: NewEmailVerificationRepo(db),
+		Expenses:          NewExpenseRepo(db),
 	}
 }
 
@@ -26,6 +28,7 @@ func (r *Repository) BeginTx() (*sqlx.Tx, error) {
 }
 
 type UserRepository interface {
+	GetByID(id int) (*models.User, error)
 	DeleteUserById(id int) error
 	GetByEmail(email string) (*models.User, error)
 	GetByEmailTx(tx *sqlx.Tx, email string) (*models.User, error)
@@ -37,4 +40,12 @@ type EmailVerificationRepository interface {
 	DeleteByUserIDTx(tx *sqlx.Tx, userID int) error
 	InsertTx(tx *sqlx.Tx, userID int, tokenHash string, expiresAt time.Time) error
 	VerifyTokenTx(tx *sqlx.Tx, tokenHash string) (*models.User, error)
+}
+
+type ExpenseRepository interface {
+	Create(userID, categoryID int, title string, description *string, amount float64, expenseDate time.Time) (*models.Expense, error)
+	GetByID(id int) (*models.Expense, error)
+	Update(id int, title string, description *string, amount float64, categoryID int, expenseDate time.Time) (*models.Expense, error)
+	Delete(id int) error
+	ListByUser(userID, limit, offset int) ([]models.Expense, int, error)
 }
