@@ -54,20 +54,21 @@ func main() {
 			r.Post("/register", handler.Register)
 			r.Post("/login", handler.Login)
 			r.Get("/verify-email", handler.VerifyEmail)
-		})
 
-		r.Group(func(r chi.Router) {
-			r.Use(appmiddleware.AuthMiddleware(jwtSigner))
-
-			r.Get("/auth/me", handler.Me)
-
-			r.Route("/expenses", func(r chi.Router) {
-				r.Post("/", handler.CreateExpense)
-				r.Get("/", handler.ListExpenses)
-				r.Put("/{id}", handler.UpdateExpense)
-				r.Delete("/{id}", handler.DeleteExpense)
+			r.Group(func(r chi.Router) {
+				r.Use(appmiddleware.AuthMiddleware(jwtSigner))
+				r.Get("/me", handler.Me)
 			})
 		})
+
+		r.Route("/expenses", func(r chi.Router) {
+			r.Use(appmiddleware.AuthMiddleware(jwtSigner))
+			r.Post("/", handler.CreateExpense)
+			r.Get("/", handler.ListExpenses)
+			r.Put("/{id}", handler.UpdateExpense)
+			r.Delete("/{id}", handler.DeleteExpense)
+		})
+
 	})
 
 	server := http.Server{
