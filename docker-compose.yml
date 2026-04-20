@@ -1,0 +1,73 @@
+# Budgeting app — API, React frontend, PostgreSQL, and Mailpit (SMTP dev sink).
+#
+# Quick start:
+#   cp docker-compose.env.example .env
+#   docker compose up --build
+#
+# URLs: frontend http://localhost:5173  API http://localhost:3000  Mailpit http://localhost:8025
+# If host port 3000 is taken (e.g. local `make run`), set API_PORT and matching VITE_API_URL in `.env` and rebuild frontend.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-budgeting}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:v1.22
+    ports:
+      - "8025:8025"
+    # SMTP for the API is on 1025 inside the compose network only
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/budgeting?sslmode=disable}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-before-production}
+      JWT_EXPIRY: ${JWT_EXPIRY:-24h}
+      EMAIL_VERIFICATION_BASE_URL: ${EMAIL_VERIFICATION_BASE_URL:-http://localhost:5173}
+      EMAIL_VERIFICATION_TOKEN_TTL: ${EMAIL_VERIFICATION_TOKEN_TTL:-48h}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@localhost}
+      CRON_SCHEDULE: ${CRON_SCHEDULE:-5 0 * * *}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      # Same Web client ID as the frontend; VITE_GOOGLE_CLIENT_ID in root .env also works (see frontend build args).
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-${VITE_GOOGLE_CLIENT_ID:-}}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+        # Baked in at build time; frontend/.env is not in the Docker context (.dockerignore).
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-${VITE_GOOGLE_CLIENT_ID:-}}
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:

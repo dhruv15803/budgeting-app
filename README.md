@@ -182,6 +182,28 @@ More frontend-specific notes: [`frontend/README.md`](frontend/README.md).
 
 ---
 
+## Docker (API, frontend, PostgreSQL, Mailpit)
+
+Requires [Docker Compose](https://docs.docker.com/compose/) (Compose V2).
+
+```bash
+cp docker-compose.env.example .env
+# Edit `.env` (set a strong `JWT_SECRET` outside local experiments).
+docker compose up --build
+```
+
+| Service    | URL |
+|-----------|-----|
+| Frontend  | http://localhost:5173 |
+| API       | http://localhost:3000 |
+| Mailpit UI (dev SMTP sink) | http://localhost:8025 |
+
+The API container runs `golang-migrate` against `DATABASE_URL` on startup, then starts the server. PostgreSQL files live in the `postgres_data` volume. For Google sign-in, set `GOOGLE_OAUTH_CLIENT_ID` in `.env` and run `docker compose build frontend` (or `docker compose up --build`) so the value is baked into the static bundle.
+
+If Compose fails to bind **port 3000** (for example because the API is already running via `make run`), stop that process or set **`API_PORT`** to a free port (e.g. `3001`) in `.env`, set **`VITE_API_URL`** to the same host URL (e.g. `http://localhost:3001/api`), then run **`docker compose up --build`** so the frontend image picks up the new API URL.
+
+---
+
 ## Features (high level)
 
 - **Auth** — Register, login, JWT-protected routes, email verification (SMTP).
