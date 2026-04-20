@@ -18,9 +18,9 @@ type createRecurringExpenseRequest struct {
 	Description *string `json:"description"`
 	Amount      float64 `json:"amount"`
 	CategoryID  int     `json:"category_id"`
-	StartDate   string  `json:"start_date"`           // YYYY-MM-DD
-	EndDate     *string `json:"end_date,omitempty"`   // YYYY-MM-DD or null
-	Frequency   string  `json:"frequency"`            // daily|weekly|monthly|yearly
+	StartDate   string  `json:"start_date"`         // YYYY-MM-DD
+	EndDate     *string `json:"end_date,omitempty"` // YYYY-MM-DD or null
+	Frequency   string  `json:"frequency"`          // daily|weekly|monthly|yearly
 }
 
 type updateRecurringExpenseRequest struct {

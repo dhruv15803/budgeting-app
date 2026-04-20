@@ -49,9 +49,10 @@ type Config struct {
 	SMTP                      SMTPConfig
 	CronSchedule              string
 	CORSAllowedOrigins        []string
+	GoogleOAuthClientID       string
 }
 
-func NewConfig(addr string, readTimeout, writeTimeout time.Duration, dbConfig DbConfig, jwtSecret string, jwtExpiry time.Duration, emailVerificationBaseURL string, emailVerificationTokenTTL time.Duration, smtp SMTPConfig, cronSchedule string, corsAllowedOrigins []string) *Config {
+func NewConfig(addr string, readTimeout, writeTimeout time.Duration, dbConfig DbConfig, jwtSecret string, jwtExpiry time.Duration, emailVerificationBaseURL string, emailVerificationTokenTTL time.Duration, smtp SMTPConfig, cronSchedule string, corsAllowedOrigins []string, googleOAuthClientID string) *Config {
 	return &Config{
 		Addr:                      addr,
 		ReadTimeout:               readTimeout,
@@ -64,6 +65,7 @@ func NewConfig(addr string, readTimeout, writeTimeout time.Duration, dbConfig Db
 		SMTP:                      smtp,
 		CronSchedule:              cronSchedule,
 		CORSAllowedOrigins:        corsAllowedOrigins,
+		GoogleOAuthClientID:       googleOAuthClientID,
 	}
 }
 
@@ -142,6 +144,8 @@ func LoadConfig() (*Config, error) {
 		corsAllowedOrigins = []string{"http://localhost:5173", "http://localhost:3001"}
 	}
 
+	googleClientID := strings.TrimSpace(os.Getenv("GOOGLE_OAUTH_CLIENT_ID"))
+
 	return NewConfig(
 		":"+port,
 		time.Second*15,
@@ -154,5 +158,6 @@ func LoadConfig() (*Config, error) {
 		smtp,
 		cronSchedule,
 		corsAllowedOrigins,
+		googleClientID,
 	), nil
 }

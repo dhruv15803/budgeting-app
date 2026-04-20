@@ -36,9 +36,12 @@ func (r *Repository) BeginTx() (*sqlx.Tx, error) {
 type UserRepository interface {
 	GetByID(id int) (*models.User, error)
 	DeleteUserById(id int) error
+	GetByGoogleSub(googleSub string) (*models.User, error)
 	GetByEmail(email string) (*models.User, error)
 	GetByEmailTx(tx *sqlx.Tx, email string) (*models.User, error)
 	CreateUserTx(tx *sqlx.Tx, email string, username *string, passwordHash string) (int, error)
+	CreateGoogleUserTx(tx *sqlx.Tx, email string, googleSub string, imageURL *string) (int, error)
+	LinkGoogleIdentityTx(tx *sqlx.Tx, userID int, googleSub string, imageURL *string) error
 	UpdateUnverifiedCredentialsTx(tx *sqlx.Tx, userID int, username *string, passwordHash string) error
 }
 

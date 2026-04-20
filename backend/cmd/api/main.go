@@ -85,6 +85,7 @@ func main() {
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", handler.Register)
 			r.Post("/login", handler.Login)
+			r.Post("/google", handler.GoogleOAuth)
 			r.Get("/verify-email", handler.VerifyEmail)
 
 			r.Group(func(r chi.Router) {

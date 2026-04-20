@@ -39,7 +39,13 @@ export function CategoryProgressRow({ row, color }: Props) {
             {formatCurrency(row.spent_amount)}
           </span>
           <span className="text-muted-foreground text-xs">
-            / {formatCurrency(row.allocated_amount)}
+            {row.allocated_amount > 0 ? (
+              <>/ {formatCurrency(row.allocated_amount)}</>
+            ) : row.spent_amount > 0 ? (
+              <span className="italic">· not allocated</span>
+            ) : (
+              <>/ {formatCurrency(0)}</>
+            )}
           </span>
         </div>
       </div>

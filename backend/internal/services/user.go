@@ -1,8 +1,10 @@
 package services
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -150,13 +152,87 @@ func (u *UserServiceImpl) Login(email string, password string) (string, error) {
 	if user == nil {
 		return "", ErrInvalidCredentials
 	}
-	if err := auth.ComparePassword(user.Password, password); err != nil {
+	if !user.Password.Valid || user.Password.String == "" {
+		return "", ErrInvalidCredentials
+	}
+	if err := auth.ComparePassword(user.Password.String, password); err != nil {
 		return "", ErrInvalidCredentials
 	}
 	if !user.IsVerified {
 		return "", ErrNotVerified
 	}
 	return u.jwt.SignAccessToken(user.ID, user.Email, user.Role)
+}
+
+func (u *UserServiceImpl) LoginWithGoogle(ctx context.Context, credential string) (string, error) {
+	if strings.TrimSpace(u.cfg.GoogleOAuthClientID) == "" {
+		return "", ErrGoogleAuthDisabled
+	}
+	claims, err := auth.ParseGoogleIDToken(ctx, strings.TrimSpace(credential), u.cfg.GoogleOAuthClientID)
+	if err != nil {
+		return "", ErrInvalidGoogleToken
+	}
+	if !claims.EmailVerified {
+		return "", ErrGoogleEmailNotVerified
+	}
+	email := normalizeEmail(claims.Email)
+	sub := claims.Sub
+	var picture *string
+	if claims.Picture != "" {
+		picture = &claims.Picture
+	}
+
+	bySub, err := u.repo.Users.GetByGoogleSub(sub)
+	if err != nil {
+		return "", err
+	}
+	if bySub != nil {
+		return u.jwt.SignAccessToken(bySub.ID, bySub.Email, bySub.Role)
+	}
+
+	byEmail, err := u.repo.Users.GetByEmail(email)
+	if err != nil {
+		return "", err
+	}
+	if byEmail != nil {
+		if byEmail.GoogleSub.Valid && byEmail.GoogleSub.String != "" && byEmail.GoogleSub.String != sub {
+			return "", ErrGoogleAccountConflict
+		}
+		if byEmail.GoogleSub.Valid && byEmail.GoogleSub.String == sub {
+			return u.jwt.SignAccessToken(byEmail.ID, byEmail.Email, byEmail.Role)
+		}
+	}
+
+	tx, err := u.repo.BeginTx()
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if byEmail == nil {
+		id, err := u.repo.Users.CreateGoogleUserTx(tx, email, sub, picture)
+		if err != nil {
+			return "", err
+		}
+		if err := tx.Commit(); err != nil {
+			return "", err
+		}
+		return u.jwt.SignAccessToken(id, email, "user")
+	}
+
+	if err := u.repo.Users.LinkGoogleIdentityTx(tx, byEmail.ID, sub, picture); err != nil {
+		if errors.Is(err, repositories.ErrGoogleLinkConflict) {
+			return "", ErrGoogleAccountConflict
+		}
+		return "", err
+	}
+	if err := u.repo.EmailVerification.DeleteByUserIDTx(tx, byEmail.ID); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	return u.jwt.SignAccessToken(byEmail.ID, byEmail.Email, byEmail.Role)
 }
 
 func (u *UserServiceImpl) VerifyEmail(rawToken string) (string, error) {

@@ -34,6 +34,7 @@ type UserService interface {
 	DeleteUserById(id int) error
 	Register(email string, password string, username *string) error
 	Login(email string, password string) (token string, err error)
+	LoginWithGoogle(ctx context.Context, credential string) (token string, err error)
 	VerifyEmail(rawToken string) (token string, err error)
 }
 

@@ -21,6 +21,11 @@ export async function login(input: LoginInput): Promise<TokenResponse> {
   return data
 }
 
+export async function googleAuth(credential: string): Promise<TokenResponse> {
+  const { data } = await api.post<TokenResponse>("/auth/google", { credential })
+  return data
+}
+
 export async function register(input: RegisterInput): Promise<null> {
   const { data } = await api.post<null>("/auth/register", input)
   return data

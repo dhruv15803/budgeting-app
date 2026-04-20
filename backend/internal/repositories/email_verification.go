@@ -61,7 +61,7 @@ func (e *EmailVerificationRepo) VerifyTokenTx(tx *sqlx.Tx, tokenHash string) (*m
 
 	var u models.User
 	err = tx.Get(&u, `
-		SELECT id, email, username, password, image_url, role::text AS role,
+		SELECT id, email, username, password, google_sub, image_url, role::text AS role,
 		       is_verified, verified_at, created_at, updated_at
 		FROM users WHERE id = $1
 	`, userID)

@@ -190,26 +190,32 @@ func (r *BudgetRepo) BulkSetCategoryBudgetsTx(tx *sqlx.Tx, budgetID int, items [
 
 // ── overview queries ─────────────────────────────────────────────────────────
 
-// GetCategorySpending returns each category allocation for the budget joined with
-// actual expense totals for the given date range.
+// GetCategorySpending returns per-category allocated amounts and spent totals for the budget month.
+// It includes every category that has an allocation for this budget OR any spending in the date
+// range (so charts show a full breakdown; spending outside allocations is still visible).
+// Rows without a monthly_category_budgets record use id = -category_id so clients get stable unique ids.
 func (r *BudgetRepo) GetCategorySpending(userID, budgetID int, from, to time.Time) ([]models.CategoryBudgetWithSpending, error) {
 	var rows []models.CategoryBudgetWithSpending
 	err := r.db.Select(&rows, `
+		WITH spent_by_cat AS (
+		    SELECT category_id, COALESCE(SUM(amount), 0)::float8 AS spent_amount
+		    FROM expenses
+		    WHERE user_id = $1
+		      AND expense_date >= $3
+		      AND expense_date <= $4
+		    GROUP BY category_id
+		)
 		SELECT
-		    mcb.id,
-		    mcb.category_id,
+		    COALESCE(mcb.id, -ec.id) AS id,
+		    ec.id AS category_id,
 		    ec.category_name,
-		    mcb.allocated_amount::float8 AS allocated_amount,
-		    COALESCE(SUM(e.amount), 0)::float8   AS spent_amount
-		FROM monthly_category_budgets mcb
-		JOIN expense_categories ec ON ec.id = mcb.category_id
-		LEFT JOIN expenses e
-		    ON  e.category_id  = mcb.category_id
-		    AND e.user_id      = $1
-		    AND e.expense_date >= $3
-		    AND e.expense_date <= $4
-		WHERE mcb.monthly_budget_id = $2
-		GROUP BY mcb.id, mcb.category_id, ec.category_name, mcb.allocated_amount
+		    COALESCE(mcb.allocated_amount, 0)::float8 AS allocated_amount,
+		    COALESCE(s.spent_amount, 0)::float8 AS spent_amount
+		FROM expense_categories ec
+		LEFT JOIN monthly_category_budgets mcb
+		    ON mcb.category_id = ec.id AND mcb.monthly_budget_id = $2
+		LEFT JOIN spent_by_cat s ON s.category_id = ec.id
+		WHERE mcb.id IS NOT NULL OR COALESCE(s.spent_amount, 0) > 0
 		ORDER BY ec.category_name ASC
 	`, userID, budgetID, from, to)
 	return rows, err

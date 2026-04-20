@@ -50,7 +50,7 @@ All protected endpoints require a Bearer token in the `Authorization` header:
 Authorization: Bearer <token>
 ```
 
-Tokens are issued by `/auth/login` and `/auth/verify-email`. There is no refresh-token mechanism; re-login when the token expires.
+Tokens are issued by `/auth/login`, `/auth/google`, and `/auth/verify-email`. There is no refresh-token mechanism; re-login when the token expires.
 
 ---
 
@@ -120,6 +120,41 @@ Authenticate and receive a JWT.
 |---|---|
 | `401 Unauthorized` | Wrong email or password |
 | `403 Forbidden` | Email not verified |
+
+---
+
+### `POST /auth/google`
+
+Sign in (or register) with a **Google ID token** from the client (e.g. Google Identity Services / Sign in with Google). The server validates the token with Google and returns the same JWT shape as `/auth/login`.
+
+Requires `GOOGLE_OAUTH_CLIENT_ID` on the server (same OAuth 2.0 **Web client ID** the frontend uses).
+
+**Request body**
+```json
+{
+  "credential": "<google id_token JWT>"
+}
+```
+
+**Response `200`**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "token": "<jwt>"
+  }
+}
+```
+
+**Errors**
+
+| Status | Condition |
+|---|---|
+| `400 Bad Request` | Google sign-in not configured, or bad JSON |
+| `401 Unauthorized` | Invalid or expired Google credential |
+| `403 Forbidden` | Google account email not verified |
+| `409 Conflict` | Email already linked to a different Google account |
 
 ---
 

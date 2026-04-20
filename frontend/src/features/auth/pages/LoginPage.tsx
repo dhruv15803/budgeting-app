@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { AuthLayout } from "@/features/auth/components/AuthLayout"
+import { GoogleSignInButton, isGoogleSignInConfigured } from "@/features/auth/components/GoogleSignInButton"
 import { useLogin } from "@/features/auth/hooks"
 import { loginSchema, type LoginValues } from "@/features/auth/schemas"
 import { useAuth } from "@/features/auth/AuthProvider"
@@ -103,6 +104,16 @@ export function LoginPage() {
             {isPending && <Loader2Icon className="animate-spin" />}
             Sign in
           </Button>
+          {isGoogleSignInConfigured() ? (
+            <>
+              <div className="flex items-center gap-3 py-1">
+                <div className="bg-border h-px flex-1" />
+                <span className="text-muted-foreground text-xs">or</span>
+                <div className="bg-border h-px flex-1" />
+              </div>
+              <GoogleSignInButton variant="signin" />
+            </>
+          ) : null}
         </form>
       </Form>
     </AuthLayout>

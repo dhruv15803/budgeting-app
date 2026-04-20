@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -28,6 +29,10 @@ type registerRequest struct {
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type googleAuthRequest struct {
+	Credential string `json:"credential"`
 }
 
 type authTokenResponse struct {
@@ -81,6 +86,45 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		_ = writeJsonError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	var resp authTokenResponse
+	resp.Success = true
+	resp.Message = "Login successful"
+	resp.Data.Token = token
+	if err := writeJsonResponse(w, http.StatusOK, resp); err != nil {
+		_ = writeJsonError(w, http.StatusInternalServerError, "internal server error")
+	}
+}
+
+func (h *Handler) GoogleOAuth(w http.ResponseWriter, r *http.Request) {
+	var req googleAuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = writeJsonError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	token, err := h.services.Users.LoginWithGoogle(r.Context(), req.Credential)
+	if errors.Is(err, services.ErrGoogleAuthDisabled) {
+		_ = writeJsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if errors.Is(err, services.ErrInvalidGoogleToken) {
+		_ = writeJsonError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	if errors.Is(err, services.ErrGoogleEmailNotVerified) {
+		_ = writeJsonError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	if errors.Is(err, services.ErrGoogleAccountConflict) {
+		_ = writeJsonError(w, http.StatusConflict, err.Error())
+		return
+	}
+	if err != nil {
+		log.Printf("GoogleOAuth: %v", err)
 		_ = writeJsonError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
